@@ -1,0 +1,170 @@
+﻿@page "/subscription"
+@layout MinimalLayout
+@using CinemaServer.DTOs
+@using CinemaServer.WebServices
+@inject CinemaApiService ApiService
+@inject AuthStateService AuthState
+@inject NavigationManager Navigation
+@rendermode InteractiveServer
+
+<PageTitle>CINEMA ONLINE - Выбрать подписку</PageTitle>
+
+<div class="subscription-hero">
+    <div class="subscription-header">
+        <button class="back-btn" @onclick="GoBack">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="15 18 9 12 15 6"></polyline>
+            </svg>
+            НАЗАД
+        </button>
+
+        @if (_isAuthenticated && _user != null)
+        {
+            <a href="/profile" class="user-header-profile">
+                <span class="user-name">@_user.Name</span>
+                <div class="user-avatar-small">
+                    @GetInitial(_user.Name)
+                </div>
+            </a>
+        }
+    </div>
+
+    <div class="subscription-content">
+        <h1 class="subscription-title">CINEMA ONLINE</h1>
+        <p class="subscription-subtitle">ВЫБЕРИТЕ ПОДПИСКУ</p>
+
+        @if (_error != null)
+        {
+            <div class="error-message" style="max-width: 600px; margin: 0 auto 2rem;">@_error</div>
+        }
+
+        @if (_isLoading)
+        {
+            <div class="loading">Загрузка тарифов...</div>
+        }
+        else if (_plans != null && _plans.Any())
+        {
+            <div class="plans-grid">
+                @foreach (var plan in _plans.Where(p => p.IsActive))
+                {
+                    var isPopular = plan.Price > _plans.Where(p => p.IsActive).Min(p => p.Price);
+                    <div class="plan-card @(isPopular ? "popular" : "")">
+                        <h2 class="plan-name">@plan.Name</h2>
+                        <div class="plan-price">
+                            @plan.Price<span class="currency">₽</span>
+                        </div>
+                        <p class="plan-period">на @plan.DurationDays дней</p>
+
+                        <div class="plan-features">
+                            <div class="plan-feature">
+                                <svg viewBox="0 0 24 24" fill="currentColor">
+                                    <path d="M9 16.2L4.8 12l-1.4 1.4L9 19 21 7l-1.4-1.4L9 16.2z"/>
+                                </svg>
+                                <span>Все премиум фильмы</span>
+                            </div>
+                            <div class="plan-feature">
+                                <svg viewBox="0 0 24 24" fill="currentColor">
+                                    <path d="M9 16.2L4.8 12l-1.4 1.4L9 19 21 7l-1.4-1.4L9 16.2z"/>
+                                </svg>
+                                <span>HD качество</span>
+                            </div>
+                            @if (isPopular)
+                            {
+                                <div class="plan-feature">
+                                    <svg viewBox="0 0 24 24" fill="currentColor">
+                                        <path d="M9 16.2L4.8 12l-1.4 1.4L9 19 21 7l-1.4-1.4L9 16.2z"/>
+                                    </svg>
+                                    <span>Без рекламы</span>
+                                </div>
+                                <div class="plan-feature">
+                                    <svg viewBox="0 0 24 24" fill="currentColor">
+                                        <path d="M9 16.2L4.8 12l-1.4 1.4L9 19 21 7l-1.4-1.4L9 16.2z"/>
+                                    </svg>
+                                    <span>Поддержка 24/7</span>
+                                </div>
+                            }
+                        </div>
+
+                        <button class="plan-btn @(isPopular ? "" : "outline")" @onclick="() => SelectPlan(plan)">
+                            Оформить подписку
+                        </button>
+                    </div>
+                }
+            </div>
+        }
+        else
+        {
+            <p style="color: var(--text-muted);">Тарифы не найдены. Проверьте подключение к API.</p>
+        }
+    </div>
+</div>
+
+@code {
+    private List<SubscriptionPlanResponse>? _plans;
+    private bool _isLoading = true;
+    private bool _isAuthenticated = false;
+    private UserResponse? _user;
+    private string? _error;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await AuthState.InitializeAsync();
+            _isAuthenticated = AuthState.IsAuthenticated;
+            _user = AuthState.CurrentUser;
+            StateHasChanged();
+        }
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadPlans();
+    }
+
+    private async Task LoadPlans()
+    {
+        _isLoading = true;
+        _error = null;
+
+        try
+        {
+            _plans = await ApiService.GetSubscriptionPlansAsync();
+        }
+        catch (HttpRequestException ex)
+        {
+            _error = $"Не удалось подключиться к серверу. ({ex.Message})";
+            _plans = new List<SubscriptionPlanResponse>();
+        }
+        catch (Exception ex)
+        {
+            _error = $"Ошибка загрузки: {ex.Message}";
+            _plans = new List<SubscriptionPlanResponse>();
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private void SelectPlan(SubscriptionPlanResponse plan)
+    {
+        if (!_isAuthenticated)
+        {
+            Navigation.NavigateTo("/profile");
+            return;
+        }
+        Navigation.NavigateTo($"/payment?planId={plan.Id}");
+    }
+
+    private void GoBack()
+    {
+        Navigation.NavigateTo("/profile");
+    }
+
+    private string GetInitial(string? name)
+    {
+        if (string.IsNullOrEmpty(name)) return "U";
+        return name[0].ToString().ToUpper();
+    }
+}

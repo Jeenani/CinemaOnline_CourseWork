@@ -1,0 +1,73 @@
+@inject AuthStateService AuthState
+@implements IDisposable
+
+<div class="auth-section">
+    @if (_isAuthenticated && _user != null)
+    {
+        @if (_user.Role == "admin")
+        {
+            <a href="/admin" style="font-size: 0.85rem; opacity: 0.8;">АДМИН</a>
+        }
+        <a href="/profile" class="user-header-profile">
+            <span class="user-name">@_user.Name</span>
+            <div class="user-avatar-small">
+                @GetInitial(_user.Name)
+            </div>
+        </a>
+    }
+    else
+    {
+        <a href="/profile">ВОЙТИ / РЕГИСТРАЦИЯ</a>
+    }
+</div>
+
+@code {
+    private bool _isAuthenticated;
+    private UserResponse? _user;
+    private bool _initialized;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            try
+            {
+                await AuthState.InitializeAsync();
+                UpdateAuthState();
+                AuthState.OnAuthStateChanged += OnAuthStateChanged;
+                _initialized = true;
+                StateHasChanged();
+            }
+            catch
+            {
+                // Ignore errors during initialization
+            }
+        }
+    }
+
+    private void OnAuthStateChanged()
+    {
+        UpdateAuthState();
+        InvokeAsync(StateHasChanged);
+    }
+
+    private void UpdateAuthState()
+    {
+        _isAuthenticated = AuthState.IsAuthenticated;
+        _user = AuthState.CurrentUser;
+    }
+
+    private string GetInitial(string? name)
+    {
+        if (string.IsNullOrEmpty(name)) return "U";
+        return name[0].ToString().ToUpper();
+    }
+
+    public void Dispose()
+    {
+        if (_initialized)
+        {
+            AuthState.OnAuthStateChanged -= OnAuthStateChanged;
+        }
+    }
+}

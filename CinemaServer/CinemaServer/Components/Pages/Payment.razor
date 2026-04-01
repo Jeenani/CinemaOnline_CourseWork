@@ -1,0 +1,282 @@
+﻿@page "/payment"
+@layout MinimalLayout
+@using CinemaServer.DTOs
+@using CinemaServer.WebServices
+@inject CinemaApiService ApiService
+@inject AuthStateService AuthState
+@inject NavigationManager Navigation
+@rendermode InteractiveServer
+
+<PageTitle>CINEMA ONLINE - Оплата подписки</PageTitle>
+
+<div class="subscription-hero" style="justify-content: flex-start; padding-top: 0;">
+    <div class="subscription-header" style="position: relative; background: none; border-bottom: 1px solid var(--border-color);">
+        <div style="display: flex; align-items: center; gap: 1rem;">
+            <button class="back-btn" @onclick="GoBack">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="15 18 9 12 15 6"></polyline>
+                </svg>
+                НАЗАД
+            </button>
+            <h1 style="font-size: 1.25rem; font-weight: 700;">Оплата подписки</h1>
+        </div>
+
+        @if (_isAuthenticated && _user != null)
+        {
+            <a href="/profile" class="user-header-profile">
+                <span class="user-name">@_user.Name</span>
+                <div class="user-avatar-small">
+                    @GetInitial(_user.Name)
+                </div>
+            </a>
+        }
+    </div>
+
+    @if (!_isAuthenticated)
+    {
+        <div style="text-align: center; margin-top: 5rem; flex: 1; display: flex; flex-direction: column; justify-content: center;">
+            <h2 style="margin-bottom: 1rem;">Требуется авторизация</h2>
+            <p style="color: var(--text-muted); margin-bottom: 2rem;">Для оформления подписки необходимо войти в аккаунт</p>
+            <a href="/profile" class="btn-primary" style="display: inline-block; width: fit-content; margin: 0 auto;">Войти</a>
+        </div>
+    }
+    else
+    {
+        <div class="payment-container" style="margin-top: 2rem;">
+            <!-- Payment Form -->
+            <div class="payment-form-card">
+                <h2>Данные платежа</h2>
+
+                <div class="form-group">
+                    <label class="form-label">Номер карты</label>
+                    <input type="text" @bind="_cardNumber" class="form-input" placeholder="0000 0000 0000 0000" maxlength="19" />
+                </div>
+
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                    <div class="form-group">
+                        <label class="form-label">Срок действия</label>
+                        <input type="text" @bind="_expiryDate" class="form-input" placeholder="MM/YY" maxlength="5" />
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">CVV</label>
+                        <input type="password" @bind="_cvv" class="form-input" placeholder="000" maxlength="3" />
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">Имя владельца карты</label>
+                    <input type="text" @bind="_cardHolder" class="form-input" placeholder="IVAN IVANOV" style="text-transform: uppercase;" />
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">Email для чека</label>
+                    <input type="email" @bind="_email" class="form-input" placeholder="email@example.com" />
+                </div>
+
+                <div class="payment-methods">
+                    <h3 class="form-label">Способ оплаты</h3>
+                    <label class="payment-method @(_paymentMethod == "card" ? "selected" : "")">
+                        <input type="radio" name="payment_method" value="card" checked="@(_paymentMethod == "card")" @onchange="@(() => _paymentMethod = "card")">
+                        <span>Банковская карта</span>
+                    </label>
+                    <label class="payment-method @(_paymentMethod == "sbp" ? "selected" : "")">
+                        <input type="radio" name="payment_method" value="sbp" checked="@(_paymentMethod == "sbp")" @onchange="@(() => _paymentMethod = "sbp")">
+                        <span>СБП (Система быстрых платежей)</span>
+                    </label>
+                </div>
+
+                <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+                    <input type="checkbox" @bind="_saveCard" style="width: 18px; height: 18px; accent-color: var(--accent);">
+                    <span style="font-size: 0.85rem;">Сохранить карту для будущих платежей</span>
+                </label>
+            </div>
+
+            <!-- Payment Summary -->
+            <div class="payment-summary">
+                <h2>Итого к оплате</h2>
+
+                @if (_error != null)
+                {
+                    <div class="error-message">@_error</div>
+                }
+
+                @if (_isLoadingPlans)
+                {
+                    <div class="loading">Загрузка...</div>
+                }
+                else if (_plans != null && _plans.Any())
+                {
+                    <div style="margin-bottom: 1.5rem;">
+                        @foreach (var plan in _plans.Where(p => p.IsActive))
+                        {
+                            var isSelected = _selectedPlan?.Id == plan.Id;
+                            <label class="payment-method @(isSelected ? "selected" : "")" @onclick="@(() => SelectPlan(plan))">
+                                <input type="radio" name="plan" checked="@isSelected">
+                                <div style="flex: 1;">
+                                    <span style="font-weight: 600;">@plan.Name</span>
+                                    <p style="font-size: 0.8rem; color: var(--text-muted); margin: 0;">@plan.DurationDays дней</p>
+                                </div>
+                                <span style="font-weight: 700; color: var(--accent);">@plan.Price ₽</span>
+                            </label>
+                        }
+                    </div>
+
+                    @if (_selectedPlan != null)
+                    {
+                        <div class="summary-row">
+                            <span>Подписка @_selectedPlan.Name</span>
+                            <span>@_selectedPlan.Price ₽</span>
+                        </div>
+                        <div class="summary-row">
+                            <span>Комиссия</span>
+                            <span>0 ₽</span>
+                        </div>
+                        <div class="summary-total">
+                            <span>ИТОГО</span>
+                            <span>@_selectedPlan.Price ₽</span>
+                        </div>
+                    }
+
+                    <p class="summary-note">
+                        Подписка автоматически продлится через @(_selectedPlan?.DurationDays ?? 30) дней. Вы сможете отменить её в любой момент в личном кабинете.
+                    </p>
+
+                    <button type="button" class="plan-btn" @onclick="HandlePayment" disabled="@(_isProcessing || _selectedPlan == null)">
+                        @(_isProcessing ? "ОБРАБОТКА..." : "ОПЛАТИТЬ")
+                    </button>
+
+                    <p class="terms-note">
+                        Нажимая кнопку, вы соглашаетесь с условиями использования сервиса
+                    </p>
+                }
+                else
+                {
+                    <p style="color: var(--text-muted);">Тарифы не найдены. Проверьте подключение к API.</p>
+                }
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    [SupplyParameterFromQuery]
+    public long? PlanId { get; set; }
+
+    private List<SubscriptionPlanResponse>? _plans;
+    private SubscriptionPlanResponse? _selectedPlan;
+    private bool _isProcessing = false;
+    private bool _isLoadingPlans = true;
+    private bool _isAuthenticated = false;
+    private UserResponse? _user;
+    private string? _error;
+
+    private string _cardNumber = "";
+    private string _expiryDate = "";
+    private string _cvv = "";
+    private string _cardHolder = "";
+    private string _email = "";
+    private string _paymentMethod = "card";
+    private bool _saveCard = true;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await AuthState.InitializeAsync();
+            _isAuthenticated = AuthState.IsAuthenticated;
+            _user = AuthState.CurrentUser;
+            _email = _user?.Email ?? "";
+            StateHasChanged();
+        }
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadPlans();
+    }
+
+    private async Task LoadPlans()
+    {
+        _isLoadingPlans = true;
+        _error = null;
+
+        try
+        {
+            _plans = await ApiService.GetSubscriptionPlansAsync();
+            
+            if (PlanId.HasValue)
+            {
+                _selectedPlan = _plans?.FirstOrDefault(p => p.Id == PlanId.Value && p.IsActive);
+            }
+            
+            _selectedPlan ??= _plans?.FirstOrDefault(p => p.IsActive);
+        }
+        catch (HttpRequestException ex)
+        {
+            _error = $"Не удалось подключиться к серверу. ({ex.Message})";
+            _plans = new List<SubscriptionPlanResponse>();
+        }
+        catch (Exception ex)
+        {
+            _error = $"Ошибка загрузки: {ex.Message}";
+            _plans = new List<SubscriptionPlanResponse>();
+        }
+        finally
+        {
+            _isLoadingPlans = false;
+        }
+    }
+
+    private void SelectPlan(SubscriptionPlanResponse plan)
+    {
+        _selectedPlan = plan;
+    }
+
+    private async Task HandlePayment()
+    {
+        if (_selectedPlan == null || string.IsNullOrEmpty(AuthState.Token)) return;
+
+        _isProcessing = true;
+        _error = null;
+        StateHasChanged();
+
+        try
+        {
+            var success = await ApiService.ActivateSubscriptionAsync(
+                _selectedPlan.Id, _paymentMethod, AuthState.Token);
+
+            if (success)
+            {
+                var updatedUser = await ApiService.GetCurrentUserAsync(AuthState.Token);
+                if (updatedUser != null)
+                    await AuthState.UpdateUserAsync(updatedUser);
+                Navigation.NavigateTo("/profile?payment=success");
+            }
+            else
+            {
+                _error = "Не удалось обработать платёж. Попробуйте ещё раз.";
+            }
+        }
+        catch (Exception ex)
+        {
+            _error = $"Ошибка оплаты: {ex.Message}";
+        }
+        finally
+        {
+            _isProcessing = false;
+            StateHasChanged();
+        }
+    }
+
+
+    private void GoBack()
+    {
+        Navigation.NavigateTo("/subscription");
+    }
+
+    private string GetInitial(string? name)
+    {
+        if (string.IsNullOrEmpty(name)) return "U";
+        return name[0].ToString().ToUpper();
+    }
+}

@@ -1,0 +1,5 @@
+{
+  "ConnectionStrings": {
+    "DefaultConnection": "Server=localhost;Port=5432;Database=CinemaOnline;Username=postgres;Password=ТВОЙ_ПАРОЛЬ_POSTGRESQL"
+  }
+}

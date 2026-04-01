@@ -1,0 +1,257 @@
+@page "/settings"
+@using CinemaServer.DTOs
+@using CinemaServer.WebServices
+@inject CinemaApiService ApiService
+@inject AuthStateService AuthState
+@inject NavigationManager Navigation
+@rendermode InteractiveServer
+
+<PageTitle>CINEMA ONLINE - Настройки</PageTitle>
+
+<div class="container" style="padding-top: 2rem; padding-bottom: 3rem;">
+    @if (!_ready)
+    {
+        <div class="loading">Загрузка...</div>
+    }
+    else if (!_isAuthenticated)
+    {
+        <div style="text-align: center; margin-top: 4rem;">
+            <h2>Требуется авторизация</h2>
+            <p style="color: var(--text-muted); margin-top: 1rem;">Для доступа к настройкам необходимо войти в аккаунт</p>
+            <a href="/profile" class="btn-primary" style="display: inline-block; margin-top: 1.5rem;">Войти</a>
+        </div>
+    }
+    else
+    {
+        <div style="display: flex; align-items: center; gap: 1rem; margin-bottom: 2rem;">
+            <a href="/profile" style="color: var(--text-muted); text-decoration: none; font-size: 0.9rem;">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 18px; height: 18px; vertical-align: middle;">
+                    <polyline points="15 18 9 12 15 6"></polyline>
+                </svg>
+                Профиль
+            </a>
+            <h1 style="font-size: 1.75rem;">Настройки аккаунта</h1>
+        </div>
+
+        @if (_successMessage != null)
+        {
+            <div class="success-message" style="margin-bottom: 1.5rem; padding: 1rem; border-radius: 0.5rem; background: rgba(76, 175, 80, 0.15); color: #4caf50; border: 1px solid rgba(76, 175, 80, 0.3);">
+                @_successMessage
+            </div>
+        }
+
+        <!-- Profile Settings -->
+        <div class="auth-form" style="max-width: 600px; margin-bottom: 2rem;">
+            <h2 style="font-size: 1.25rem; margin-bottom: 1.5rem;">Личные данные</h2>
+
+            @if (_profileError != null)
+            {
+                <div class="error-message" style="margin-bottom: 1rem;">@_profileError</div>
+            }
+
+            <div class="form-group">
+                <label class="form-label">Имя</label>
+                <input type="text" class="form-input" @bind="_name" placeholder="Ваше имя" />
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">Email</label>
+                <input type="email" class="form-input" @bind="_email" placeholder="email@example.com" />
+            </div>
+
+            <button class="btn-primary" style="width: 100%;" disabled="@_isSavingProfile" @onclick="SaveProfile">
+                @(_isSavingProfile ? "Сохранение..." : "Сохранить изменения")
+            </button>
+        </div>
+
+        <!-- Password Change -->
+        <div class="auth-form" style="max-width: 600px; margin-bottom: 2rem;">
+            <h2 style="font-size: 1.25rem; margin-bottom: 1.5rem;">Смена пароля</h2>
+
+            @if (_passwordError != null)
+            {
+                <div class="error-message" style="margin-bottom: 1rem;">@_passwordError</div>
+            }
+
+            <div class="form-group">
+                <label class="form-label">Текущий пароль</label>
+                <input type="password" class="form-input" @bind="_currentPassword" placeholder="••••••••" />
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">Новый пароль</label>
+                <input type="password" class="form-input" @bind="_newPassword" placeholder="Минимум 6 символов" />
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">Подтверждение пароля</label>
+                <input type="password" class="form-input" @bind="_confirmPassword" placeholder="Повторите новый пароль" />
+            </div>
+
+            <button class="btn-primary" style="width: 100%;" disabled="@_isChangingPassword" @onclick="ChangePassword">
+                @(_isChangingPassword ? "Изменение..." : "Изменить пароль")
+            </button>
+        </div>
+
+        <!-- Subscription Info -->
+        <div class="auth-form" style="max-width: 600px;">
+            <h2 style="font-size: 1.25rem; margin-bottom: 1.5rem;">Подписка</h2>
+
+            @if (_user?.HasSubscription == true && _user.Subscription != null)
+            {
+                <div style="margin-bottom: 1rem;">
+                    <span class="premium-badge" style="position: static; display: inline-block; font-size: 0.8rem; padding: 0.4rem 1rem;">
+                        @_user.Subscription.Name.ToUpper()
+                    </span>
+                </div>
+                <p style="margin-bottom: 0.5rem;"><strong>Тариф:</strong> @_user.Subscription.Name</p>
+                <p style="margin-bottom: 1rem; color: var(--text-muted);">Действует до: @_user.Subscription.EndDate?.ToString("dd.MM.yyyy HH:mm")</p>
+                <a href="/subscription" class="btn-secondary" style="display: inline-block; text-decoration: none;">Изменить подписку</a>
+            }
+            else
+            {
+                <p style="color: var(--text-muted); margin-bottom: 1rem;">У вас нет активной подписки</p>
+                <a href="/subscription" class="btn-primary" style="display: inline-block; text-decoration: none;">Оформить подписку</a>
+            }
+        </div>
+    }
+</div>
+
+@code {
+    private bool _ready;
+    private bool _isAuthenticated;
+    private UserResponse? _user;
+
+    private string _name = "";
+    private string _email = "";
+    private string _currentPassword = "";
+    private string _newPassword = "";
+    private string _confirmPassword = "";
+
+    private bool _isSavingProfile;
+    private bool _isChangingPassword;
+    private string? _profileError;
+    private string? _passwordError;
+    private string? _successMessage;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender) return;
+
+        await AuthState.InitializeAsync();
+        _isAuthenticated = AuthState.IsAuthenticated;
+        _user = AuthState.CurrentUser;
+
+        if (_user != null)
+        {
+            _name = _user.Name;
+            _email = _user.Email;
+        }
+
+        _ready = true;
+        StateHasChanged();
+    }
+
+    private async Task SaveProfile()
+    {
+        _profileError = null;
+        _successMessage = null;
+
+        if (string.IsNullOrWhiteSpace(_name))
+        {
+            _profileError = "Имя не может быть пустым";
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(_email) || !_email.Contains('@'))
+        {
+            _profileError = "Введите корректный email";
+            return;
+        }
+
+        _isSavingProfile = true;
+        StateHasChanged();
+
+        try
+        {
+            var (ok, error) = await ApiService.UpdateProfileAsync(_name.Trim(), _email.Trim(), AuthState.Token!);
+            if (ok)
+            {
+                var updated = await ApiService.GetCurrentUserAsync(AuthState.Token!);
+                if (updated != null)
+                {
+                    await AuthState.UpdateUserAsync(updated);
+                    _user = updated;
+                    _name = updated.Name;
+                    _email = updated.Email;
+                }
+                _successMessage = "Профиль успешно обновлён";
+            }
+            else
+            {
+                _profileError = error ?? "Ошибка обновления профиля";
+            }
+        }
+        catch (Exception ex)
+        {
+            _profileError = $"Ошибка: {ex.Message}";
+        }
+        finally
+        {
+            _isSavingProfile = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task ChangePassword()
+    {
+        _passwordError = null;
+        _successMessage = null;
+
+        if (string.IsNullOrWhiteSpace(_currentPassword))
+        {
+            _passwordError = "Введите текущий пароль";
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(_newPassword) || _newPassword.Length < 6)
+        {
+            _passwordError = "Новый пароль должен быть не менее 6 символов";
+            return;
+        }
+
+        if (_newPassword != _confirmPassword)
+        {
+            _passwordError = "Пароли не совпадают";
+            return;
+        }
+
+        _isChangingPassword = true;
+        StateHasChanged();
+
+        try
+        {
+            var (ok, error) = await ApiService.ChangePasswordAsync(_currentPassword, _newPassword, AuthState.Token!);
+            if (ok)
+            {
+                _successMessage = "Пароль успешно изменён";
+                _currentPassword = "";
+                _newPassword = "";
+                _confirmPassword = "";
+            }
+            else
+            {
+                _passwordError = error ?? "Ошибка смены пароля";
+            }
+        }
+        catch (Exception ex)
+        {
+            _passwordError = $"Ошибка: {ex.Message}";
+        }
+        finally
+        {
+            _isChangingPassword = false;
+            StateHasChanged();
+        }
+    }
+}

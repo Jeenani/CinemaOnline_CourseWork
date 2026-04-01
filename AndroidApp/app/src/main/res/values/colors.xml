@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="background">#FF2A0513</color>
+    <color name="background_footer">#FF1A020B</color>
+    <color name="text_primary">#FFFFFFFF</color>
+    <color name="text_inactive">#FFB3999F</color>
+    <color name="accent_pink">#FFEDD0D7</color>
+    <color name="card_background">#FFB3999F</color>
+    <color name="premium_gold">#FFEAB308</color>
+    <color name="input_background">#FFEDD0D7</color>
+    <color name="input_text">#FF2A0513</color>
+    <color name="input_hint">#80493040</color>
+    <color name="error_red">#FFFF4444</color>
+    <color name="error">#FFFF4444</color>
+    <color name="black">#FF000000</color>
+    <color name="white">#FFFFFFFF</color>
+    <color name="transparent">#00000000</color>
+    <color name="star_filled">#FFEAB308</color>
+    <color name="star_empty">#FF555555</color>
+    <color name="divider">#FF4A2030</color>
+    <color name="card_border">#FF4A2030</color>
+    <color name="background_card_dark">#FF3D1525</color>
+</resources>

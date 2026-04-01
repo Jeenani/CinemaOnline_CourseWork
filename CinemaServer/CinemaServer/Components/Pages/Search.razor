@@ -1,0 +1,256 @@
+﻿@page "/movies"
+@using CinemaServer.DTOs
+@using CinemaServer.WebServices
+@inject CinemaApiService ApiService
+@inject NavigationManager Navigation
+@rendermode InteractiveServer
+
+<PageTitle>CINEMA ONLINE - Каталог фильмов</PageTitle>
+
+<div class="container" style="padding-top: 2rem; padding-bottom: 3rem;">
+    <div class="page-header">
+        <h1 class="section-title">Каталог фильмов</h1>
+        <a href="/search" class="btn-search-link">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="11" cy="11" r="8"></circle>
+                <path d="m21 21-4.35-4.35"></path>
+            </svg>
+            Расширенный поиск
+        </a>
+    </div>
+
+    <!-- Mini Sort -->
+    <div class="sort-bar">
+        <div class="sort-group">
+            <label class="form-label">Сортировка:</label>
+            <select @bind="_sortBy" @bind:after="LoadMovies" class="form-select sort-select">
+                <option value="date">По дате</option>
+                <option value="rating">По рейтингу</option>
+                <option value="views">По популярности</option>
+                <option value="title">По названию</option>
+                <option value="year">По году</option>
+            </select>
+        </div>
+        <div class="sort-group">
+            <label class="form-label">Жанр:</label>
+            <select @bind="_selectedGenreId" @bind:after="OnGenreChanged" class="form-select sort-select">
+                <option value="">Все жанры</option>
+                @if (_genres != null)
+                {
+                    @foreach (var genre in _genres)
+                    {
+                        <option value="@genre.Id">@genre.DisplayName</option>
+                    }
+                }
+            </select>
+        </div>
+    </div>
+
+    <!-- Error -->
+    @if (_error != null)
+    {
+        <div class="error-message">@_error</div>
+    }
+
+    <!-- Loading -->
+    @if (_isLoading)
+    {
+        <div class="loading">Загрузка фильмов...</div>
+    }
+    else if (_movies != null && _movies.Any())
+    {
+        <!-- Results Info -->
+        @if (_response != null)
+        {
+            <div class="results-info">
+                <span>Всего: @_response.TotalCount фильмов</span>
+            </div>
+        }
+
+        <!-- Movies Grid -->
+        <div class="movies-grid">
+            @foreach (var movie in _movies)
+            {
+                <a href="/movie/@movie.Id" class="movie-card">
+                    <div class="movie-card-poster">
+                        @if (movie.NeedSubscription)
+                        {
+                            <div class="premium-badge">PREMIUM</div>
+                        }
+                        <img src="@GetPosterUrl(movie.PosterUrl)" alt="@movie.Title">
+                    </div>
+                    <div class="movie-card-body">
+                        <h3 class="movie-title">@movie.Title</h3>
+                        <div class="movie-meta">
+                            @if (movie.ReleaseYear.HasValue)
+                            {
+                                <span>@movie.ReleaseYear</span>
+                            }
+                            @if (!string.IsNullOrEmpty(movie.Country))
+                            {
+                                <span>• @movie.Country</span>
+                            }
+                        </div>
+                        <div class="movie-genres">
+                            @foreach (var genre in movie.Genres.Take(2))
+                            {
+                                <span class="genre-badge">@genre</span>
+                            }
+                        </div>
+                        <div class="movie-rating">
+                            @for (int i = 1; i <= 5; i++)
+                            {
+                                var starClass = i <= Math.Round(movie.AverageRating) ? "star" : "star empty";
+                                <svg class="@starClass" viewBox="0 0 24 24">
+                                    <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
+                                </svg>
+                            }
+                            <span class="rating-value">@movie.AverageRating.ToString("0.0")</span>
+                        </div>
+                    </div>
+                </a>
+            }
+        </div>
+
+        <!-- Pagination -->
+        @if (_response != null && _response.TotalPages > 1)
+        {
+            <div class="pagination">
+                <button class="pagination-btn" disabled="@(_currentPage <= 1)" @onclick="PrevPage">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <polyline points="15 18 9 12 15 6"></polyline>
+                    </svg>
+                </button>
+
+                @for (int i = Math.Max(1, _currentPage - 2); i <= Math.Min(_response.TotalPages, _currentPage + 2); i++)
+                {
+                    var pageNum = i;
+                    <button class="pagination-btn @(pageNum == _currentPage ? "active" : "")" @onclick="() => GoToPage(pageNum)">
+                        @pageNum
+                    </button>
+                }
+
+                <button class="pagination-btn" disabled="@(_currentPage >= _response.TotalPages)" @onclick="NextPage">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <polyline points="9 18 15 12 9 6"></polyline>
+                    </svg>
+                </button>
+            </div>
+        }
+    }
+    else if (!_isLoading)
+    {
+        <div class="no-results">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="11" cy="11" r="8"></circle>
+                <path d="m21 21-4.35-4.35"></path>
+            </svg>
+            <p>Фильмы не найдены</p>
+            <a href="/search" class="btn-primary" style="margin-top: 1rem;">Перейти к поиску</a>
+        </div>
+    }
+</div>
+
+@code {
+    private List<MovieResponse>? _movies;
+    private PagedResponse<MovieResponse>? _response;
+    private List<GenreResponse>? _genres;
+    private bool _isLoading = true;
+    private string? _error;
+
+    // Filters
+    private string _selectedGenreId = "";
+    private string _sortBy = "date";
+    private int _currentPage = 1;
+    private const int PageSize = 12;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadFiltersData();
+        await LoadMovies();
+    }
+
+    private async Task LoadFiltersData()
+    {
+        try
+        {
+            _genres = await ApiService.GetGenresAsync();
+        }
+        catch
+        {
+            // Ignore filter loading errors
+        }
+    }
+
+    private async Task OnGenreChanged()
+    {
+        _currentPage = 1;
+        await LoadMovies();
+    }
+
+    private async Task LoadMovies()
+    {
+        _isLoading = true;
+        _error = null;
+        StateHasChanged();
+
+        try
+        {
+            var request = new MovieSearchRequest
+            {
+                GenreId = string.IsNullOrEmpty(_selectedGenreId) ? null : long.Parse(_selectedGenreId),
+                SortBy = _sortBy,
+                SortDescending = true,
+                Page = _currentPage,
+                PageSize = PageSize
+            };
+
+            _response = await ApiService.GetMoviesAsync(request);
+            _movies = _response?.Items;
+        }
+        catch (HttpRequestException ex)
+        {
+            _error = $"Не удалось подключиться к серверу. ({ex.Message})";
+        }
+        catch (Exception ex)
+        {
+            _error = $"Ошибка загрузки: {ex.Message}";
+        }
+        finally
+        {
+            _isLoading = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task GoToPage(int page)
+    {
+        _currentPage = page;
+        await LoadMovies();
+    }
+
+    private async Task PrevPage()
+    {
+        if (_currentPage > 1)
+        {
+            _currentPage--;
+            await LoadMovies();
+        }
+    }
+
+    private async Task NextPage()
+    {
+        if (_response != null && _currentPage < _response.TotalPages)
+        {
+            _currentPage++;
+            await LoadMovies();
+        }
+    }
+
+    private string GetPosterUrl(string? posterUrl)
+    {
+        if (string.IsNullOrEmpty(posterUrl))
+            return "/images/no-poster.svg";
+        return posterUrl;
+    }
+}

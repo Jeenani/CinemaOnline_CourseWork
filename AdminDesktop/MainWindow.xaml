@@ -1,0 +1,415 @@
+﻿<Window x:Class="AdminDesktop.MainWindow"
+xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+xmlns:vm="clr-namespace:AdminDesktop.ViewModels"
+xmlns:lvc="clr-namespace:LiveChartsCore.SkiaSharpView.WPF;assembly=LiveChartsCore.SkiaSharpView.WPF"
+Title="Cinema Online — Админ-панель" Width="1280" Height="800"
+MinWidth="900" MinHeight="600" WindowStartupLocation="CenterScreen"
+Background="{StaticResource BgDarkBrush}">
+
+    <Window.DataContext>
+        <vm:MainViewModel/>
+    </Window.DataContext>
+
+    <Grid>
+        <!-- LOGIN SCREEN -->
+        <Border Visibility="{Binding IsNotLoggedIn, Converter={StaticResource BoolVis}}"
+                Background="{StaticResource BgDarkBrush}" Panel.ZIndex="10">
+            <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center" Width="360">
+                <TextBlock Text="🎬 CINEMA ADMIN" FontSize="28" FontWeight="Bold"
+                           Foreground="{StaticResource AccentBrush}" HorizontalAlignment="Center" Margin="0,0,0,8"/>
+                <TextBlock Text="Панель администратора" Foreground="{StaticResource TextMutedBrush}"
+                           HorizontalAlignment="Center" Margin="0,0,0,32"/>
+
+                <Border Style="{StaticResource Card}">
+                    <StackPanel>
+                        <TextBlock Style="{StaticResource FormLabel}" Text="Email"/>
+                        <TextBox Text="{Binding LoginEmail, UpdateSourceTrigger=PropertyChanged}" Margin="0,0,0,12"/>
+
+                        <TextBlock Style="{StaticResource FormLabel}" Text="Пароль"/>
+                        <PasswordBox x:Name="PwdBox" Margin="0,0,0,16"
+                                     KeyDown="PwdBox_KeyDown"/>
+
+                        <TextBlock Text="{Binding LoginError}" Foreground="{StaticResource DangerBrush}"
+                                   FontSize="12" Margin="0,0,0,8"
+                                   Visibility="{Binding LoginError, Converter={StaticResource NullVis}}"/>
+
+                        <Button Style="{StaticResource BtnPrimary}" Content="ВОЙТИ" HorizontalAlignment="Stretch"
+                                Click="LoginBtn_Click"/>
+                    </StackPanel>
+                </Border>
+            </StackPanel>
+        </Border>
+
+        <!-- MAIN LAYOUT -->
+        <Grid Visibility="{Binding IsLoggedIn, Converter={StaticResource BoolVis}}">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="220"/>
+                <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions>
+
+            <!-- SIDEBAR -->
+            <Border Background="{StaticResource BgSidebarBrush}" BorderBrush="{StaticResource BorderBrush}"
+                    BorderThickness="0,0,1,0">
+                <DockPanel>
+                    <StackPanel DockPanel.Dock="Top" Margin="16,20,16,24">
+                        <TextBlock Text="🎬 CINEMA" FontSize="20" FontWeight="Bold"
+                                   Foreground="{StaticResource AccentBrush}"/>
+                        <TextBlock Text="{Binding AdminName}" Foreground="{StaticResource TextMutedBrush}"
+                                   FontSize="12" Margin="0,4,0,0"/>
+                    </StackPanel>
+
+                    <StackPanel DockPanel.Dock="Bottom" Margin="8,0,8,16">
+                        <Button Style="{StaticResource BtnGhost}" Content="⟳ Обновить"
+                                Command="{Binding RefreshCommand}" Margin="0,0,0,4"/>
+                        <Button Style="{StaticResource BtnGhost}" Content="🚪 Выход"
+                                Command="{Binding LogoutCommand}"/>
+                    </StackPanel>
+
+                    <StackPanel Margin="8,0">
+                        <RadioButton Style="{StaticResource NavBtn}" Content="📊  Статистика"
+                                     IsChecked="True" Click="Nav_Click" Tag="0"/>
+                        <RadioButton Style="{StaticResource NavBtn}" Content="🎬  Фильмы"
+                                     Click="Nav_Click" Tag="1"/>
+                        <RadioButton Style="{StaticResource NavBtn}" Content="👥  Пользователи"
+                                     Click="Nav_Click" Tag="2"/>
+                        <RadioButton Style="{StaticResource NavBtn}" Content="📁  Контент"
+                                     Click="Nav_Click" Tag="3"/>
+                    </StackPanel>
+                </DockPanel>
+            </Border>
+
+            <!-- CONTENT AREA -->
+            <DockPanel Grid.Column="1">
+                <!-- Status bar -->
+                <Border DockPanel.Dock="Bottom" Background="{StaticResource BgSidebarBrush}"
+                        Padding="16,6" BorderBrush="{StaticResource BorderBrush}" BorderThickness="0,1,0,0">
+                    <TextBlock Text="{Binding StatusMessage}" Foreground="{StaticResource TextMutedBrush}" FontSize="11"/>
+                </Border>
+
+                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                    <Grid Margin="24,20">
+                        <!-- TAB 0: Dashboard -->
+                        <StackPanel Visibility="{Binding SelectedTab, Converter={StaticResource EqConv}, ConverterParameter=0}">
+                            <TextBlock Text="Статистика" FontSize="22" FontWeight="Bold"
+                                       Foreground="{StaticResource TextBrush}" Margin="0,0,0,20"/>
+
+                            <!-- Charts row 1: Bar + Pie -->
+                            <Grid Margin="0,0,0,20">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="2*"/>
+                                    <ColumnDefinition Width="16"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+
+                                <!-- Bar chart -->
+                                <Border Style="{StaticResource Card}" Grid.Column="0">
+                                    <DockPanel>
+                                        <TextBlock DockPanel.Dock="Top" Text="Ключевые метрики" FontSize="14" FontWeight="SemiBold"
+                                                   Foreground="{StaticResource TextBrush}" Margin="0,0,0,8"/>
+                                        <lvc:CartesianChart Height="260"
+                                                            Series="{Binding MetricsBarSeries}"
+                                                            XAxes="{Binding MetricsXAxes}"
+                                                            YAxes="{Binding MetricsYAxes}">
+                                        </lvc:CartesianChart>
+                                    </DockPanel>
+                                </Border>
+
+                                <!-- Pie chart -->
+                                <Border Style="{StaticResource Card}" Grid.Column="2">
+                                    <DockPanel>
+                                        <TextBlock DockPanel.Dock="Top" Text="Контент" FontSize="14" FontWeight="SemiBold"
+                                                   Foreground="{StaticResource TextBrush}" Margin="0,0,0,8"/>
+                                        <lvc:PieChart Height="260"
+                                                      Series="{Binding ContentPieSeries}"
+                                                      InitialRotation="-90">
+                                        </lvc:PieChart>
+                                    </DockPanel>
+                                </Border>
+                            </Grid>
+
+                            <!-- Charts row 2: Gauge + Info -->
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="16"/>
+                                    <ColumnDefinition Width="2*"/>
+                                </Grid.ColumnDefinitions>
+
+                                <!-- Gauge: subscriptions -->
+                                <Border Style="{StaticResource Card}" Grid.Column="0">
+                                    <DockPanel>
+                                        <TextBlock DockPanel.Dock="Top" Text="Подписки / Пользователи" FontSize="14" FontWeight="SemiBold"
+                                                   Foreground="{StaticResource TextBrush}" Margin="0,0,0,4"/>
+                                        <TextBlock DockPanel.Dock="Bottom" HorizontalAlignment="Center"
+                                                   Foreground="{StaticResource TextMutedBrush}" FontSize="12" Margin="0,4,0,0">
+                                            <TextBlock.Text>
+                                                <MultiBinding StringFormat="{}{0} из {1} пользователей">
+                                                    <Binding Path="Stats.ActiveSubscriptions"/>
+                                                    <Binding Path="Stats.UsersCount"/>
+                                                </MultiBinding>
+                                            </TextBlock.Text>
+                                        </TextBlock>
+                                        <lvc:PieChart Height="180"
+                                                      Series="{Binding ActivityGaugeSeries}"
+                                                      InitialRotation="-90"
+                                                      MinValue="0" MaxValue="100">
+                                        </lvc:PieChart>
+                                    </DockPanel>
+                                </Border>
+
+                                <!-- Summary info -->
+                                <Border Style="{StaticResource Card}" Grid.Column="2">
+                                    <StackPanel>
+                                        <TextBlock Text="Сводка" FontSize="14" FontWeight="SemiBold"
+                                                   Foreground="{StaticResource TextBrush}" Margin="0,0,0,12"/>
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition/><ColumnDefinition/><ColumnDefinition/><ColumnDefinition/>
+                                            </Grid.ColumnDefinitions>
+                                            <Grid.RowDefinitions>
+                                                <RowDefinition Height="Auto"/><RowDefinition Height="12"/><RowDefinition Height="Auto"/>
+                                            </Grid.RowDefinitions>
+
+                                            <StackPanel Grid.Row="0" Grid.Column="0" HorizontalAlignment="Center">
+                                                <TextBlock Text="{Binding Stats.MoviesCount}" FontSize="32" FontWeight="Bold"
+                                                           Foreground="{StaticResource AccentBrush}" HorizontalAlignment="Center"/>
+                                                <TextBlock Text="Фильмов" FontSize="11" Foreground="{StaticResource TextMutedBrush}" HorizontalAlignment="Center"/>
+                                            </StackPanel>
+                                            <StackPanel Grid.Row="0" Grid.Column="1" HorizontalAlignment="Center">
+                                                <TextBlock Text="{Binding Stats.UsersCount}" FontSize="32" FontWeight="Bold"
+                                                           Foreground="#9D6BFF" HorizontalAlignment="Center"/>
+                                                <TextBlock Text="Пользователей" FontSize="11" Foreground="{StaticResource TextMutedBrush}" HorizontalAlignment="Center"/>
+                                            </StackPanel>
+                                            <StackPanel Grid.Row="0" Grid.Column="2" HorizontalAlignment="Center">
+                                                <TextBlock Text="{Binding Stats.TotalViews, StringFormat={}{0:N0}}" FontSize="32" FontWeight="Bold"
+                                                           Foreground="#6BC5FF" HorizontalAlignment="Center"/>
+                                                <TextBlock Text="Просмотров" FontSize="11" Foreground="{StaticResource TextMutedBrush}" HorizontalAlignment="Center"/>
+                                            </StackPanel>
+                                            <StackPanel Grid.Row="0" Grid.Column="3" HorizontalAlignment="Center">
+                                                <TextBlock Text="{Binding Stats.PaidPayments}" FontSize="32" FontWeight="Bold"
+                                                           Foreground="#6BFFAA" HorizontalAlignment="Center"/>
+                                                <TextBlock Text="Оплат" FontSize="11" Foreground="{StaticResource TextMutedBrush}" HorizontalAlignment="Center"/>
+                                            </StackPanel>
+
+                                            <StackPanel Grid.Row="2" Grid.Column="0" HorizontalAlignment="Center">
+                                                <TextBlock Text="{Binding Stats.CommentsCount}" FontSize="32" FontWeight="Bold"
+                                                           Foreground="#FFC86B" HorizontalAlignment="Center"/>
+                                                <TextBlock Text="Комментариев" FontSize="11" Foreground="{StaticResource TextMutedBrush}" HorizontalAlignment="Center"/>
+                                            </StackPanel>
+                                            <StackPanel Grid.Row="2" Grid.Column="1" HorizontalAlignment="Center">
+                                                <TextBlock Text="{Binding Stats.GenresCount}" FontSize="32" FontWeight="Bold"
+                                                           Foreground="#FF9D6B" HorizontalAlignment="Center"/>
+                                                <TextBlock Text="Жанров" FontSize="11" Foreground="{StaticResource TextMutedBrush}" HorizontalAlignment="Center"/>
+                                            </StackPanel>
+                                            <StackPanel Grid.Row="2" Grid.Column="2" HorizontalAlignment="Center">
+                                                <TextBlock Text="{Binding Stats.CollectionsCount}" FontSize="32" FontWeight="Bold"
+                                                           Foreground="#C56BFF" HorizontalAlignment="Center"/>
+                                                <TextBlock Text="Коллекций" FontSize="11" Foreground="{StaticResource TextMutedBrush}" HorizontalAlignment="Center"/>
+                                            </StackPanel>
+                                            <StackPanel Grid.Row="2" Grid.Column="3" HorizontalAlignment="Center">
+                                                <TextBlock Text="{Binding Stats.ActiveSubscriptions}" FontSize="32" FontWeight="Bold"
+                                                           Foreground="#FF6B6B" HorizontalAlignment="Center"/>
+                                                <TextBlock Text="Подписок" FontSize="11" Foreground="{StaticResource TextMutedBrush}" HorizontalAlignment="Center"/>
+                                            </StackPanel>
+                                        </Grid>
+                                    </StackPanel>
+                                </Border>
+                            </Grid>
+                        </StackPanel>
+
+                        <!-- TAB 1: Movies -->
+                        <StackPanel Visibility="{Binding SelectedTab, Converter={StaticResource EqConv}, ConverterParameter=1}">
+                            <DockPanel Margin="0,0,0,16">
+                                <TextBlock Text="Фильмы" FontSize="22" FontWeight="Bold"
+                                           Foreground="{StaticResource TextBrush}" VerticalAlignment="Center"/>
+                                <Button Style="{StaticResource BtnPrimary}" Content="+ Добавить" DockPanel.Dock="Right"
+                                        HorizontalAlignment="Right" Command="{Binding AddMovieCommand}"/>
+                            </DockPanel>
+
+                            <!-- Movie Editor -->
+                            <Border Style="{StaticResource Card}" Margin="0,0,0,16"
+                                    Visibility="{Binding ShowMovieEditor, Converter={StaticResource BoolVis}}">
+                                <StackPanel>
+                                    <TextBlock Text="Редактор фильма" FontSize="16" FontWeight="SemiBold"
+                                               Foreground="{StaticResource TextBrush}" Margin="0,0,0,12"/>
+
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition/><ColumnDefinition Width="12"/><ColumnDefinition/>
+                                        </Grid.ColumnDefinitions>
+                                        <Grid.RowDefinitions>
+                                            <RowDefinition/><RowDefinition/><RowDefinition/><RowDefinition/>
+                                        </Grid.RowDefinitions>
+
+                                        <StackPanel Grid.Row="0" Grid.Column="0" Margin="0,0,0,8">
+                                            <TextBlock Style="{StaticResource FormLabel}" Text="Название *"/>
+                                            <TextBox Text="{Binding EditTitle, UpdateSourceTrigger=PropertyChanged}"/>
+                                        </StackPanel>
+                                        <StackPanel Grid.Row="0" Grid.Column="2" Margin="0,0,0,8">
+                                            <TextBlock Style="{StaticResource FormLabel}" Text="Год"/>
+                                            <TextBox Text="{Binding EditYear, UpdateSourceTrigger=PropertyChanged}"/>
+                                        </StackPanel>
+
+                                        <StackPanel Grid.Row="1" Grid.Column="0" Margin="0,0,0,8">
+                                            <TextBlock Style="{StaticResource FormLabel}" Text="Страна"/>
+                                            <TextBox Text="{Binding EditCountry, UpdateSourceTrigger=PropertyChanged}"/>
+                                        </StackPanel>
+                                        <StackPanel Grid.Row="1" Grid.Column="2" Margin="0,0,0,8">
+                                            <TextBlock Style="{StaticResource FormLabel}" Text="Режиссёр"/>
+                                            <TextBox Text="{Binding EditDirector, UpdateSourceTrigger=PropertyChanged}"/>
+                                        </StackPanel>
+
+                                        <StackPanel Grid.Row="2" Grid.Column="0" Margin="0,0,0,8">
+                                            <TextBlock Style="{StaticResource FormLabel}" Text="Длительность (мин)"/>
+                                            <TextBox Text="{Binding EditDuration, UpdateSourceTrigger=PropertyChanged}"/>
+                                        </StackPanel>
+                                        <StackPanel Grid.Row="2" Grid.Column="2" Margin="0,0,0,8">
+                                            <CheckBox Content="  Требуется подписка (Premium)" IsChecked="{Binding EditNeedSub}"
+                                                      VerticalAlignment="Bottom" Margin="0,0,0,4"/>
+                                        </StackPanel>
+                                    </Grid>
+
+                                    <TextBlock Style="{StaticResource FormLabel}" Text="VK Видео URL" Margin="0,4,0,4"/>
+                                    <DockPanel Margin="0,0,0,4">
+                                        <Button DockPanel.Dock="Right" Style="{StaticResource BtnPrimary}"
+                                                Content="Извлечь из iframe" Margin="8,0,0,0"
+                                                Click="ExtractVkUrl_Click"/>
+                                        <TextBox Text="{Binding EditVkVideoUrl, UpdateSourceTrigger=PropertyChanged}"
+                                                 ToolTip="https://vkvideo.ru/video_ext.php?oid=..."/>
+                                    </DockPanel>
+
+                                    <TextBlock Style="{StaticResource FormLabel}" Text="Описание" Margin="0,8,0,4"/>
+                                    <TextBox Text="{Binding EditDescription, UpdateSourceTrigger=PropertyChanged}"
+                                             AcceptsReturn="True" TextWrapping="Wrap" Height="60"/>
+
+                                    <StackPanel Orientation="Horizontal" Margin="0,16,0,0">
+                                        <Button Style="{StaticResource BtnPrimary}" Content="Сохранить"
+                                                Command="{Binding SaveMovieCommand}" Margin="0,0,8,0"/>
+                                        <Button Style="{StaticResource BtnGhost}" Content="Отмена"
+                                                Command="{Binding CancelEditCommand}"/>
+                                    </StackPanel>
+                                </StackPanel>
+                            </Border>
+
+                            <!-- Movies DataGrid -->
+                            <DataGrid ItemsSource="{Binding Movies}" SelectedItem="{Binding SelectedMovie}">
+                                <DataGrid.Columns>
+                                    <DataGridTextColumn Header="ID" Binding="{Binding Id}" Width="50"/>
+                                    <DataGridTextColumn Header="Название" Binding="{Binding Title}" Width="*"/>
+                                    <DataGridTextColumn Header="Год" Binding="{Binding ReleaseYear}" Width="60"/>
+                                    <DataGridTextColumn Header="Страна" Binding="{Binding Country}" Width="100"/>
+                                    <DataGridTextColumn Header="Рейтинг" Binding="{Binding AverageRating, StringFormat={}{0:0.0}}" Width="70"/>
+                                    <DataGridTextColumn Header="Просмотры" Binding="{Binding ViewCount}" Width="85"/>
+                                    <DataGridTemplateColumn Header="" Width="140">
+                                        <DataGridTemplateColumn.CellTemplate>
+                                            <DataTemplate>
+                                                <StackPanel Orientation="Horizontal">
+                                                    <Button Content="✏️" Style="{StaticResource BtnGhost}" Padding="6,4"
+                                                            Click="EditMovie_Click" Tag="{Binding}"/>
+                                                    <Button Content="🗑️" Style="{StaticResource BtnGhost}" Padding="6,4"
+                                                            Foreground="{StaticResource DangerBrush}"
+                                                            Click="DeleteMovie_Click" Tag="{Binding Id}"/>
+                                                </StackPanel>
+                                            </DataTemplate>
+                                        </DataGridTemplateColumn.CellTemplate>
+                                    </DataGridTemplateColumn>
+                                </DataGrid.Columns>
+                            </DataGrid>
+                        </StackPanel>
+
+                        <!-- TAB 2: Users -->
+                        <StackPanel Visibility="{Binding SelectedTab, Converter={StaticResource EqConv}, ConverterParameter=2}">
+                            <TextBlock Text="Пользователи" FontSize="22" FontWeight="Bold"
+                                       Foreground="{StaticResource TextBrush}" Margin="0,0,0,16"/>
+                            <DataGrid ItemsSource="{Binding Users}">
+                                <DataGrid.Columns>
+                                    <DataGridTextColumn Header="ID" Binding="{Binding Id}" Width="50"/>
+                                    <DataGridTextColumn Header="Имя" Binding="{Binding Name}" Width="*"/>
+                                    <DataGridTextColumn Header="Email" Binding="{Binding Email}" Width="200"/>
+                                    <DataGridTextColumn Header="Роль" Binding="{Binding Role}" Width="80"/>
+                                    <DataGridTextColumn Header="Подписка" Binding="{Binding SubscriptionName}" Width="100"/>
+                                    <DataGridTemplateColumn Header="" Width="160">
+                                        <DataGridTemplateColumn.CellTemplate>
+                                            <DataTemplate>
+                                                <StackPanel Orientation="Horizontal">
+                                                    <Button Content="👑 Admin" Style="{StaticResource BtnGhost}" Padding="4,2"
+                                                            Click="MakeAdmin_Click" Tag="{Binding Id}" FontSize="11"/>
+                                                    <Button Content="🗑️" Style="{StaticResource BtnGhost}" Padding="6,4"
+                                                            Foreground="{StaticResource DangerBrush}"
+                                                            Click="DeleteUser_Click" Tag="{Binding Id}"/>
+                                                </StackPanel>
+                                            </DataTemplate>
+                                        </DataGridTemplateColumn.CellTemplate>
+                                    </DataGridTemplateColumn>
+                                </DataGrid.Columns>
+                            </DataGrid>
+                        </StackPanel>
+
+                        <!-- TAB 3: Content -->
+                        <StackPanel Visibility="{Binding SelectedTab, Converter={StaticResource EqConv}, ConverterParameter=3}">
+                            <TextBlock Text="Контент" FontSize="22" FontWeight="Bold"
+                                       Foreground="{StaticResource TextBrush}" Margin="0,0,0,16"/>
+
+                            <!-- Genres -->
+                            <Border Style="{StaticResource Card}" Margin="0,0,0,16">
+                                <StackPanel>
+                                    <TextBlock Text="Жанры" FontSize="16" FontWeight="SemiBold"
+                                               Foreground="{StaticResource TextBrush}" Margin="0,0,0,8"/>
+                                    <DockPanel Margin="0,0,0,8">
+                                        <Button DockPanel.Dock="Right" Style="{StaticResource BtnPrimary}"
+                                                Content="Добавить" Command="{Binding AddGenreCommand}" Margin="8,0,0,0"/>
+                                        <TextBox Text="{Binding NewGenreName, UpdateSourceTrigger=PropertyChanged}"
+                                                 ToolTip="Название жанра"/>
+                                    </DockPanel>
+                                    <ItemsControl ItemsSource="{Binding Genres}">
+                                        <ItemsControl.ItemsPanel>
+                                            <ItemsPanelTemplate><WrapPanel/></ItemsPanelTemplate>
+                                        </ItemsControl.ItemsPanel>
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate>
+                                                <Border Background="#30FF6B9D" CornerRadius="4" Padding="8,4" Margin="0,0,6,6">
+                                                    <StackPanel Orientation="Horizontal">
+                                                        <TextBlock Text="{Binding DisplayName}" Foreground="{StaticResource TextBrush}"
+                                                                   FontSize="12" VerticalAlignment="Center"/>
+                                                        <Button Content="✕" Style="{StaticResource BtnGhost}" Padding="4,0"
+                                                                FontSize="10" Margin="6,0,0,0"
+                                                                Click="DeleteGenre_Click" Tag="{Binding Id}"/>
+                                                    </StackPanel>
+                                                </Border>
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+                                </StackPanel>
+                            </Border>
+
+                            <!-- Comments -->
+                            <TextBlock Text="Последние комментарии" FontSize="16" FontWeight="SemiBold"
+                                       Foreground="{StaticResource TextBrush}" Margin="0,0,0,8"/>
+                            <DataGrid ItemsSource="{Binding Comments}" MaxHeight="400">
+                                <DataGrid.Columns>
+                                    <DataGridTextColumn Header="Пользователь" Binding="{Binding UserName}" Width="120"/>
+                                    <DataGridTextColumn Header="Фильм" Binding="{Binding MovieTitle}" Width="150"/>
+                                    <DataGridTextColumn Header="Текст" Binding="{Binding Content}" Width="*"/>
+                                    <DataGridTemplateColumn Header="" Width="100">
+                                        <DataGridTemplateColumn.CellTemplate>
+                                            <DataTemplate>
+                                                <StackPanel Orientation="Horizontal">
+                                                    <Button Content="👁️" Style="{StaticResource BtnGhost}" Padding="4,2"
+                                                            Click="ToggleComment_Click" Tag="{Binding Id}"/>
+                                                    <Button Content="🗑️" Style="{StaticResource BtnGhost}" Padding="4,2"
+                                                            Foreground="{StaticResource DangerBrush}"
+                                                            Click="DeleteComment_Click" Tag="{Binding Id}"/>
+                                                </StackPanel>
+                                            </DataTemplate>
+                                        </DataGridTemplateColumn.CellTemplate>
+                                    </DataGridTemplateColumn>
+                                </DataGrid.Columns>
+                            </DataGrid>
+                        </StackPanel>
+                    </Grid>
+                </ScrollViewer>
+            </DockPanel>
+        </Grid>
+    </Grid>
+</Window>

@@ -1,0 +1,29 @@
+﻿@page "/Error"
+@using System.Diagnostics
+
+<PageTitle>CINEMA ONLINE - Ошибка</PageTitle>
+
+<div class="container" style="padding: 3rem; text-align: center;">
+    <h1 style="color: var(--accent); margin-bottom: 1rem;">Ошибка</h1>
+    <h2 style="margin-bottom: 2rem;">Произошла ошибка при обработке запроса.</h2>
+
+    @if (ShowRequestId)
+    {
+        <p style="color: var(--text-muted);">
+            <strong>ID запроса:</strong> <code>@RequestId</code>
+        </p>
+    }
+
+    <a href="/" class="btn-primary" style="margin-top: 2rem;">Вернуться на главную</a>
+</div>
+
+@code{
+    [CascadingParameter]
+    private HttpContext? HttpContext { get; set; }
+
+    private string? RequestId { get; set; }
+    private bool ShowRequestId => !string.IsNullOrEmpty(RequestId);
+
+    protected override void OnInitialized() =>
+        RequestId = Activity.Current?.Id ?? HttpContext?.TraceIdentifier;
+}

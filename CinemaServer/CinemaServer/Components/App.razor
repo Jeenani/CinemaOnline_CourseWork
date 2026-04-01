@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="ru">
+
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+    <meta http-equiv="Pragma" content="no-cache" />
+    <meta http-equiv="Expires" content="0" />
+    <base href="/" />
+    <title>CINEMA ONLINE</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Bona+Nova+SC:wght@400;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="css/app.css?v=@(_cssVersion)" />
+    <link rel="icon" type="image/png" href="favicon.png" />
+    <HeadOutlet />
+</head>
+
+<body>
+    <Routes />
+    <script src="_framework/blazor.web.js?v=@(_cssVersion)"></script>
+</body>
+
+</html>
+
+@code {
+    // Версия привязана к дате сборки DLL — пересобрал проект = новая версия = кэш сбрасывается
+    private static readonly string _cssVersion = typeof(App).Assembly.GetName().Version?.ToString()
+        ?? File.GetLastWriteTimeUtc(typeof(App).Assembly.Location).Ticks.ToString();
+}

@@ -1,0 +1,19 @@
+<Solution>
+  <Configurations>
+    <BuildType Name="Debug" />
+    <BuildType Name="Release" />
+    <BuildType Name="Publish-Win" />
+    <BuildType Name="Publish-Linux" />
+  </Configurations>
+  <Project Path="../AdminDesktop/AdminDesktop.csproj">
+    <Configuration Solution="Publish-Win|*" Project="Release" Build="false" />
+    <Configuration Solution="Publish-Linux|*" Project="Release" Build="false" />
+    <BuildType Solution="Publish-Linux|*" Project="Release" />
+    <BuildType Solution="Publish-Win|*" Project="Release" />
+  </Project>
+  <Project Path="../CinemaServer.Tests/CinemaServer.Tests.csproj">
+    <BuildType Solution="Publish-Linux|*" Project="Release" />
+    <BuildType Solution="Publish-Win|*" Project="Release" />
+  </Project>
+  <Project Path="CinemaServer/CinemaServer.csproj" />
+</Solution>

@@ -1,0 +1,187 @@
+@page "/"
+@inject CinemaApiService ApiService
+@rendermode InteractiveServer
+
+<PageTitle>CINEMA ONLINE - Главная</PageTitle>
+
+<!-- Hero Section with Random Movie Banner -->
+<div class="hero" style="@(_randomMovie != null ? $"background: linear-gradient(135deg, rgba(42, 5, 19, 0.75), rgba(26, 2, 11, 0.65));" : "")">
+    @if (_randomMovie != null)
+    {
+        <img src="@GetBannerUrl(_randomMovie)" alt="@_randomMovie.Title"
+             style="position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; z-index: 0;">
+        <div style="position: absolute; inset: 0; background: linear-gradient(135deg, rgba(42, 5, 19, 0.8), rgba(26, 2, 11, 0.7)); z-index: 1;"></div>
+    }
+    <div class="hero-content" style="position: relative; z-index: 2;">
+        <h1>CINEMA ONLINE</h1>
+        <p>Смотрите лучшие фильмы онлайн</p>
+        @if (_randomMovie != null)
+        {
+            <p style="font-size: 1.25rem; color: var(--accent); margin-bottom: 1.5rem; font-weight: 600;">@_randomMovie.Title</p>
+            <a href="/movie/@_randomMovie.Id" class="btn-primary">СМОТРЕТЬ СЕЙЧАС</a>
+        }
+        else
+        {
+            <a href="/movies" class="btn-primary">СМОТРЕТЬ СЕЙЧАС</a>
+        }
+    </div>
+</div>
+
+<!-- Main Content -->
+<div class="container" style="padding-top: 3rem; padding-bottom: 3rem;">
+    @if (_error != null)
+    {
+        <div class="error-message">@_error</div>
+    }
+
+    <!-- Featured Collection -->
+    @if (_featuredMovies != null && _featuredMovies.Any())
+    {
+        <section style="margin-bottom: 4rem;">
+            <h2 class="section-title">Подборка месяца</h2>
+            
+            <div class="carousel-container">
+                <div class="carousel-wrapper">
+                    @foreach (var movie in _featuredMovies.Take(6))
+                    {
+                        <a href="/movie/@movie.Id" class="carousel-item">
+                            <img src="@GetPosterUrl(movie.PosterUrl)" alt="@movie.Title">
+                            <div class="carousel-overlay"></div>
+                            @if (movie.NeedSubscription)
+                            {
+                                <div class="premium-badge">PREMIUM</div>
+                            }
+                        </a>
+                    }
+                </div>
+            </div>
+        </section>
+    }
+
+    <!-- New Movies -->
+    <section>
+        <h2 class="section-title">Новые фильмы</h2>
+        
+        @if (_isLoading)
+        {
+            <div class="loading">Загрузка фильмов...</div>
+        }
+        else if (_movies != null && _movies.Any())
+        {
+            <div class="movies-grid">
+                @foreach (var movie in _movies)
+                {
+                    <a href="/movie/@movie.Id" class="movie-card">
+                        <div class="movie-card-poster">
+                            @if (movie.NeedSubscription)
+                            {
+                                <div class="premium-badge">PREMIUM</div>
+                            }
+                            <img src="@GetPosterUrl(movie.PosterUrl)" alt="@movie.Title">
+                        </div>
+                        <div class="movie-card-body">
+                            <h3 class="movie-title">@movie.Title</h3>
+                            <div class="movie-genres">
+                                @foreach (var genre in movie.Genres.Take(2))
+                                {
+                                    <span class="genre-badge">@genre</span>
+                                }
+                            </div>
+                            <div class="movie-rating">
+                                @for (int i = 1; i <= 5; i++)
+                                {
+                                    var starClass = i <= Math.Round(movie.AverageRating) ? "star" : "star empty";
+                                    <svg class="@starClass" viewBox="0 0 24 24">
+                                        <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
+                                    </svg>
+                                }
+                            </div>
+                        </div>
+                    </a>
+                }
+            </div>
+        }
+        else
+        {
+            <p style="color: var(--text-muted);">Фильмы не найдены. Проверьте подключение к API.</p>
+        }
+    </section>
+</div>
+
+@code {
+    private List<MovieResponse>? _movies;
+    private List<MovieResponse>? _featuredMovies;
+    private MovieResponse? _randomMovie;
+    private bool _isLoading = true;
+    private string? _error;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadData();
+    }
+
+    private async Task LoadData()
+    {
+        _isLoading = true;
+        _error = null;
+        
+        try
+        {
+            var moviesResponse = await ApiService.GetMoviesAsync(new MovieSearchRequest 
+            { 
+                SortBy = "date", 
+                PageSize = 6 
+            });
+            _movies = moviesResponse?.Items;
+
+            var collections = await ApiService.GetFeaturedCollectionsAsync();
+            _featuredMovies = collections?.FirstOrDefault()?.Movies;
+            
+            if (_featuredMovies == null || !_featuredMovies.Any())
+            {
+                _featuredMovies = _movies;
+            }
+
+            try
+            {
+                _randomMovie = await ApiService.GetRandomMovieAsync();
+            }
+            catch
+            {
+                _randomMovie = null;
+            }
+        }
+        catch (HttpRequestException ex)
+        {
+            _error = $"Не удалось подключиться к серверу API. ({ex.Message})";
+        }
+        catch (TaskCanceledException)
+        {
+            _error = "Превышено время ожидания ответа от сервера.";
+        }
+        catch (Exception ex)
+        {
+            _error = $"Ошибка загрузки данных: {ex.Message}";
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private string GetPosterUrl(string? posterUrl)
+    {
+        if (string.IsNullOrEmpty(posterUrl))
+            return "/images/no-poster.svg";
+        return posterUrl;
+    }
+
+    private string GetBannerUrl(MovieResponse movie)
+    {
+        if (!string.IsNullOrEmpty(movie.BannerUrl))
+            return movie.BannerUrl;
+        if (!string.IsNullOrEmpty(movie.PosterUrl))
+            return movie.PosterUrl;
+        return "/images/no-poster.svg";
+    }
+}

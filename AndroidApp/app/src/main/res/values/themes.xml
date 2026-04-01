@@ -1,0 +1,44 @@
+<resources xmlns:tools="http://schemas.android.com/tools">
+    <!-- Base application theme. -->
+    <style name="Theme.CinemaAndroid" parent="Theme.MaterialComponents.NoActionBar">
+        <!-- Primary brand color. -->
+        <item name="colorPrimary">@color/accent_pink</item>
+        <item name="colorPrimaryVariant">@color/background_footer</item>
+        <item name="colorOnPrimary">@color/background</item>
+        <!-- Secondary brand color. -->
+        <item name="colorSecondary">@color/accent_pink</item>
+        <item name="colorOnSecondary">@color/background</item>
+        <!-- Status bar color. -->
+        <item name="android:statusBarColor">@color/background_footer</item>
+        <item name="android:navigationBarColor">@color/background_footer</item>
+        <item name="android:windowBackground">@color/background</item>
+        <item name="android:textColorPrimary">@color/text_primary</item>
+        <item name="android:textColorSecondary">@color/text_inactive</item>
+        <!-- Customize your theme here. -->
+    </style>
+
+    <style name="CinemaEditText" parent="Widget.MaterialComponents.TextInputLayout.OutlinedBox">
+        <item name="boxBackgroundColor">@color/input_background</item>
+        <item name="boxStrokeColor">@color/accent_pink</item>
+        <item name="hintTextColor">@color/accent_pink</item>
+        <item name="android:textColorHint">@color/text_inactive</item>
+    </style>
+
+    <style name="CinemaButton" parent="Widget.MaterialComponents.Button">
+        <item name="backgroundTint">@color/accent_pink</item>
+        <item name="android:textColor">@color/background</item>
+        <item name="cornerRadius">12dp</item>
+    </style>
+
+    <style name="CinemaButtonOutlined" parent="Widget.MaterialComponents.Button.OutlinedButton">
+        <item name="strokeColor">@color/accent_pink</item>
+        <item name="android:textColor">@color/accent_pink</item>
+        <item name="cornerRadius">12dp</item>
+    </style>
+
+    <style name="PremiumButton" parent="Widget.MaterialComponents.Button">
+        <item name="backgroundTint">@color/premium_gold</item>
+        <item name="android:textColor">@color/background</item>
+        <item name="cornerRadius">12dp</item>
+    </style>
+</resources>

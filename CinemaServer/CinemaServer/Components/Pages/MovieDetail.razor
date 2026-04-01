@@ -1,0 +1,407 @@
+﻿@page "/movie/{Id:long}"
+@using CinemaServer.DTOs
+@using CinemaServer.WebServices
+@inject CinemaApiService ApiService
+@inject AuthStateService AuthState
+@inject NavigationManager Navigation
+@rendermode InteractiveServer
+
+<PageTitle>CINEMA ONLINE - @(_movie?.Title ?? "Загрузка...")</PageTitle>
+
+<div class="container" style="padding-top: 3rem; padding-bottom: 3rem;">
+    @if (_error != null)
+    {
+        <div class="error-message">@_error</div>
+        <a href="/movies" class="btn-primary" style="margin-top: 1rem;">Вернуться к каталогу</a>
+    }
+    else if (_isLoading)
+    {
+        <div class="loading">Загрузка информации о фильме...</div>
+    }
+    else if (_movie != null)
+    {
+        <!-- Movie Header -->
+        <div class="movie-header">
+            <div style="position: relative;">
+                @if (_movie.NeedSubscription)
+                {
+                    <div class="premium-badge" style="left: auto; right: 1rem;">PREMIUM</div>
+                }
+                <img src="@GetPosterUrl(_movie.PosterUrl)" alt="@_movie.Title" class="movie-poster">
+            </div>
+            
+            <div class="movie-details">
+                <h1>@_movie.Title @(_movie.ReleaseYear.HasValue ? $"({_movie.ReleaseYear})" : "")</h1>
+                
+                @if (_movie.NeedSubscription)
+                {
+                    <div class="premium-notice">
+                        <svg viewBox="0 0 24 24" fill="currentColor" style="width: 20px; height: 20px;">
+                            <path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z"/>
+                        </svg>
+                        Доступно по подписке Premium
+                    </div>
+                }
+                
+                <p class="movie-description">
+                    @(_movie.Description ?? "Описание отсутствует")
+                </p>
+
+                <div class="movie-genres" style="margin-bottom: 1.5rem;">
+                    @foreach (var genre in _movie.Genres)
+                    {
+                        <span class="genre-badge">@genre.ToUpper()</span>
+                    }
+                </div>
+
+                <div class="movie-meta">
+                    @if (_movie.ReleaseYear.HasValue)
+                    {
+                        <p class="meta-item"><strong>Год выпуска:</strong> @_movie.ReleaseYear</p>
+                    }
+                    @if (_movie.DurationMinutes.HasValue)
+                    {
+                        <p class="meta-item"><strong>Продолжительность:</strong> @_movie.DurationMinutes мин</p>
+                    }
+                    @if (!string.IsNullOrEmpty(_movie.Director))
+                    {
+                        <p class="meta-item"><strong>Режиссёр:</strong> @_movie.Director</p>
+                    }
+                    @if (!string.IsNullOrEmpty(_movie.Country))
+                    {
+                        <p class="meta-item"><strong>Страна:</strong> @_movie.Country</p>
+                    }
+                    <p class="meta-item"><strong>Просмотров:</strong> @_movie.ViewCount</p>
+                </div>
+
+                <div class="rating-section">
+                    <p class="rating-label">Оценка пользователей:</p>
+                    <div class="movie-rating">
+                        @for (int i = 1; i <= 5; i++)
+                        {
+                            var starClass = i <= Math.Round(_movie.AverageRating) ? "star" : "star empty";
+                            <svg class="@starClass" viewBox="0 0 24 24">
+                                <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
+                            </svg>
+                        }
+                        <span style="margin-left: 0.5rem; color: var(--text-muted);">(@_movie.RatingsCount оценок)</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Video Player -->
+        <section id="player" style="margin-bottom: 2rem;">
+            <div class="video-player">
+                <div class="player-content">
+                    @if (_movie.NeedSubscription && !HasPremiumAccess())
+                    {
+                        <div style="text-align: center; padding: 2rem;">
+                            <div class="premium-badge" style="position: static; display: inline-block; margin-bottom: 1rem; font-size: 0.9rem; padding: 0.5rem 1rem;">PREMIUM</div>
+                            <p style="margin-bottom: 1rem; color: var(--text-light);">Для просмотра необходима подписка Premium</p>
+                            <a href="/subscription" class="btn-primary">Оформить подписку</a>
+                        </div>
+                    }
+                    else if (!string.IsNullOrEmpty(_movie.VkVideoUrl))
+                    {
+                        <div style="width: 100%; position: relative; padding-bottom: 56.25%; height: 0; overflow: hidden; background: #000;">
+                            <iframe src="@_movie.VkVideoUrl"
+                                    style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; border: none; background: #000;"
+                                    allowfullscreen="true"
+                                    allow="autoplay; encrypted-media; fullscreen; picture-in-picture">
+                            </iframe>
+                        </div>
+                    }
+                    else if (!string.IsNullOrEmpty(_movie.VideoUrl))
+                    {
+                        <video controls style="width: 100%; height: 100%;">
+                            <source src="@_movie.VideoUrl" type="video/mp4">
+                            Ваш браузер не поддерживает видео.
+                        </video>
+                    }
+                    else
+                    {
+                        <div style="text-align: center; padding: 2rem;">
+                            <p style="color: var(--text-muted);">Видео недоступно</p>
+                        </div>
+                    }
+                </div>
+            </div>
+        </section>
+
+        <!-- Comments Section -->
+        <section class="comments-section">
+            <h2>Комментарии (@_movie.Comments.Count)</h2>
+
+            <!-- Star Rating -->
+            @if (_isAuthenticated)
+            {
+                @if (_movie.NeedSubscription && !HasPremiumAccess())
+                {
+                    <div class="comment-box" style="margin-bottom: 1rem;">
+                        <p style="font-weight: 600; margin-bottom: 0.5rem;">Ваша оценка:</p>
+                        <p style="color: var(--text-muted); font-size: 0.9rem;">
+                            Для оценки этого фильма необходима
+                            <a href="/subscription" style="font-weight: 700; color: var(--accent);">подписка Premium</a>.
+                        </p>
+                    </div>
+                }
+                else
+                {
+                <div class="comment-box" style="margin-bottom: 1rem;">
+                    <p style="font-weight: 600; margin-bottom: 0.5rem;">Ваша оценка:</p>
+                    <div class="star-rating-input">
+                        @for (int i = 1; i <= 5; i++)
+                        {
+                            var star = i;
+                            var hovered = _hoverRating > 0 ? _hoverRating : _userRating;
+                            var cls = star <= hovered ? "star-btn active" : "star-btn";
+                            <button class="@cls"
+                                    @onclick="() => SubmitRating(star)"
+                                    @onmouseover="() => _hoverRating = star"
+                                    @onmouseout="() => _hoverRating = 0"
+                                    disabled="@_isSubmittingRating">
+                                <svg viewBox="0 0 24 24">
+                                    <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
+                                </svg>
+                            </button>
+                        }
+                        @if (_userRating > 0)
+                        {
+                            <span style="margin-left: 0.75rem; color: var(--text-muted); font-size: 0.9rem;">@_userRating из 5</span>
+                        }
+                    </div>
+                    @if (_ratingMessage != null)
+                    {
+                        <p style="color: var(--accent); font-size: 0.85rem; margin-top: 0.5rem;">@_ratingMessage</p>
+                    }
+                </div>
+                }
+            }
+            
+            @if (_isAuthenticated)
+            {
+                @if (_movie.NeedSubscription && !HasPremiumAccess())
+                {
+                    <div class="comment-box" style="margin-bottom: 1rem;">
+                        <p>Для комментирования этого фильма необходима <a href="/subscription" style="font-weight: 700; color: var(--accent);">подписка Premium</a>.</p>
+                    </div>
+                }
+                else
+                {
+                    <div class="comment-box" style="margin-bottom: 1rem;">
+                        <div class="form-group" style="margin-bottom: 0.75rem;">
+                            <textarea class="form-input" rows="3" placeholder="Напишите комментарий..."
+                                      @bind="_newComment" @bind:event="oninput"></textarea>
+                        </div>
+                        <button class="btn-primary" style="padding: 0.5rem 1.5rem;" disabled="@(_isSubmittingComment || string.IsNullOrWhiteSpace(_newComment))"
+                                @onclick="HandlePostComment">
+                            @(_isSubmittingComment ? "Отправка..." : "Отправить")
+                        </button>
+                        @if (_commentError != null)
+                        {
+                            <p style="color: #ff6b6b; font-size: 0.85rem; margin-top: 0.5rem;">@_commentError</p>
+                        }
+                    </div>
+                }
+            }
+            else
+            {
+                <div class="comment-box" style="margin-bottom: 1rem;">
+                    <p><a href="/profile" style="font-weight: 700; color: var(--accent);">Войдите</a> или <a href="/profile" style="font-weight: 700; color: var(--accent);">зарегистрируйтесь</a>, чтобы делиться впечатлениями!</p>
+                </div>
+            }
+
+            @if (_movie.Comments.Any())
+            {
+                @foreach (var comment in _movie.Comments)
+                {
+                    <div class="comment-box" style="margin-bottom: 1rem;">
+                        <p style="font-weight: 600; margin-bottom: 0.5rem;">@comment.UserName</p>
+                        <p style="color: var(--text-muted); font-size: 0.85rem; margin-bottom: 0.5rem;">@comment.CreatedAt.ToString("dd.MM.yyyy HH:mm")</p>
+                        <p>@comment.Content</p>
+                    </div>
+                }
+            }
+            else
+            {
+                <p style="color: var(--text-muted);">Комментариев пока нет. Будьте первым!</p>
+            }
+        </section>
+    }
+    else
+    {
+        <div class="error-message">Фильм не найден</div>
+        <a href="/movies" class="btn-primary" style="margin-top: 1rem;">Вернуться к каталогу</a>
+    }
+</div>
+
+@code {
+[Parameter]
+public long Id { get; set; }
+
+private MovieDetailResponse? _movie;
+private bool _isLoading = true;
+private string? _error;
+private bool _isAuthenticated;
+private UserResponse? _user;
+private string _newComment = string.Empty;
+private bool _isSubmittingComment;
+private string? _commentError;
+private int _userRating;
+private int _hoverRating;
+private bool _isSubmittingRating;
+private string? _ratingMessage;
+private long _loadedId;
+
+protected override async Task OnInitializedAsync()
+{
+    _loadedId = Id;
+    await LoadMovie();
+}
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (Id != _loadedId)
+        {
+            _loadedId = Id;
+            await LoadMovie();
+        }
+    }
+
+    private async Task LoadMovie()
+    {
+        _isLoading = true;
+        _error = null;
+        StateHasChanged();
+        
+        try
+        {
+            _movie = await ApiService.GetMovieByIdAsync(Id, AuthState.Token);
+            if (_movie == null)
+            {
+                _error = "Фильм не найден";
+            }
+            else
+            {
+                _userRating = _movie.UserRating ?? 0;
+            }
+        }
+        catch (HttpRequestException ex)
+        {
+            _error = $"Не удалось подключиться к серверу API. ({ex.Message})";
+        }
+        catch (TaskCanceledException)
+        {
+            _error = "Превышено время ожидания ответа от сервера.";
+        }
+        catch (Exception ex)
+        {
+            _error = $"Ошибка загрузки: {ex.Message}";
+        }
+        finally
+        {
+            _isLoading = false;
+            StateHasChanged();
+        }
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await AuthState.InitializeAsync();
+            _isAuthenticated = AuthState.IsAuthenticated;
+            _user = AuthState.CurrentUser;
+            StateHasChanged();
+        }
+    }
+
+    private async Task HandlePostComment()
+    {
+        if (string.IsNullOrWhiteSpace(_newComment) || !_isAuthenticated || string.IsNullOrEmpty(AuthState.Token))
+            return;
+
+        var trimmed = _newComment.Trim();
+        if (trimmed.Length > 2000)
+        {
+            _commentError = "Комментарий не может быть длиннее 2000 символов";
+            StateHasChanged();
+            return;
+        }
+
+        _isSubmittingComment = true;
+        _commentError = null;
+        StateHasChanged();
+
+        try
+        {
+            var success = await ApiService.PostCommentAsync(Id, trimmed, AuthState.Token);
+            if (success)
+            {
+                _newComment = string.Empty;
+                await LoadMovie();
+            }
+            else
+            {
+                _commentError = "Не удалось отправить комментарий";
+            }
+        }
+        catch
+        {
+            _commentError = "Ошибка при отправке комментария";
+        }
+        finally
+        {
+            _isSubmittingComment = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task SubmitRating(int rating)
+    {
+        if (!_isAuthenticated || string.IsNullOrEmpty(AuthState.Token)) return;
+
+        _isSubmittingRating = true;
+        _ratingMessage = null;
+        StateHasChanged();
+
+        try
+        {
+            var success = await ApiService.RateMovieAsync(Id, rating, AuthState.Token);
+            if (success)
+            {
+                _userRating = rating;
+                _ratingMessage = "Оценка сохранена!";
+                await LoadMovie();
+            }
+            else
+            {
+                _ratingMessage = "Не удалось сохранить оценку";
+            }
+        }
+        catch
+        {
+            _ratingMessage = "Ошибка при отправке оценки";
+        }
+        finally
+        {
+            _isSubmittingRating = false;
+            StateHasChanged();
+        }
+    }
+
+    private bool HasPremiumAccess()
+    {
+        if (_user == null || !_user.HasSubscription || _user.Subscription == null) return false;
+        var name = _user.Subscription.Name.ToLower();
+        return name.Contains("premium") || name.Contains("про") || name.Contains("pro");
+    }
+
+    private string GetPosterUrl(string? posterUrl)
+    {
+        if (string.IsNullOrEmpty(posterUrl))
+            return "/images/no-poster.svg";
+        return posterUrl;
+    }
+}
