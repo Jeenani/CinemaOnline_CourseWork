@@ -1,7 +1,0 @@
-{
-  "port": 8044,
-  "defaultPathFormat": "Windows",
-  "disabledTools": [
-    "get_solution_tree"
-  ]
-}
